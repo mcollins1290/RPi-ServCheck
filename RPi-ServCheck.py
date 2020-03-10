@@ -20,6 +20,7 @@ EMAILSETTINGS = []
 
 ## GLOBAL VARS ##
 
+debug = True
 sendEmailonOK = True
 
 #################
@@ -74,6 +75,34 @@ def getSettings():
 					print("ERROR: Missing " + section + " option: " + option +". Please check " + settings_filename)
 					sys.exit(1)
 
+	# Settings file sections and options valid. Now retrieve/parse values and store in global dicts
+	try:
+		# Populate General dict
+		GENERAL = {'ENABLED':config.getboolean('General', 'Enabled')}
+		# Populate Email Settings dict
+		EMAILSETTINGS =	{
+			'FROM_EMAIL':config.get('EmailSettings', 'FromEmail'),
+			'TO_EMAIL':config.get('EmailSettings', 'ToEmail'),
+			'PASSWORD':config.get('EmailSettings', 'Password'),
+			'SMTP_HOST':config.get('EmailSettings', 'SMTPHost'),
+			'SMTP_PORT':config.getint('EmailSettings', 'SMTPPort')}
+		# Populate Exit Codes dict
+		EXITCODES = {sect: dict(config.items(sect)) for sect in config.sections()}
+
+		################## DEBUGGING ##################
+		if (debug):
+			for key, value in GENERAL.items():
+				print(key, value)
+			for key, value in EMAILSETTINGS.items():
+                        	print(key, value)
+			for key, value in EXITCODES.items():
+                        	print(key, value)
+		###############################################
+
+	except ValueError as e:
+		print("ERROR: Unable to parse values from settings file: \n" + str(e))
+		sys.exit(1)
+
 if __name__ == '__main__':
 
 	# First check that script is being run as root user.
@@ -81,6 +110,9 @@ if __name__ == '__main__':
 		print("ERROR: This Python script must be run as root.")
 		sys.exit(1)
 	# Script is being run as root. Continue...
+	# Debug Status
+	if (debug):
+		print("INFO: DEBUGGING ENABLED\n")
 	chkArgs(sys.argv[1:])
 	getSettings()
 	sys.exit(0)
