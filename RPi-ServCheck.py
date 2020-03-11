@@ -87,21 +87,46 @@ def getSettings():
 			'SMTP_HOST':config.get('EmailSettings', 'SMTPHost'),
 			'SMTP_PORT':config.getint('EmailSettings', 'SMTPPort')}
 		# Populate Exit Codes dict
-		EXITCODES = {sect: dict(config.items(sect)) for sect in config.sections()}
+		EXITCODES = dict(config.items('ExitCodes'))
+		# Populate Services dict
+		SERVICES = dict(config.items('Services'))
 
 		################## DEBUGGING ##################
 		if (debug):
+			print("DEBUG: Dumping Dictionary Keys & Values:\n")
 			for key, value in GENERAL.items():
 				print(key, value)
 			for key, value in EMAILSETTINGS.items():
-                        	print(key, value)
+				print(key, value)
 			for key, value in EXITCODES.items():
-                        	print(key, value)
+				print(key, value)
+			for key, value in SERVICES.items():
+				print(key, value)
+			print("\nDEBUG: Dump Complete")
 		###############################################
 
 	except ValueError as e:
 		print("ERROR: Unable to parse values from settings file: \n" + str(e))
 		sys.exit(1)
+
+def main():
+	global GENERAL
+	global SERVICES
+	global EXITCODES
+	global EMAILSETTINGS
+
+	# Check Enabled flag in settings file is set to True, otherwise print message and exit
+	if not(GENERAL['ENABLED']):
+		print("INFO: 'Enabled' flag in settings file is not set to True. Exiting...")
+		sys.exit(0)
+
+	# Iterate through Services dict, check Service status for each valid Service
+	for serviceName,toCheck in SERVICES.items():
+		if toCheck.lower() == 'true':
+			osCommand = 'systemctl status ' + serviceName + ' > /dev/null 2>&1'
+			exitCode = os.WEXITSTATUS(os.system(osCommand))
+			print (serviceName + ' exit code is: ' + str(exitCode) + ' : ' + EXITCODES.get(str(exitCode), 'Unknown Exit Code'))
+
 
 if __name__ == '__main__':
 
@@ -115,4 +140,8 @@ if __name__ == '__main__':
 		print("INFO: DEBUGGING ENABLED\n")
 	chkArgs(sys.argv[1:])
 	getSettings()
+	main()
+	# Program complete. Exit cleanly
+	if (debug):
+		print("INFO: Process completed successfully. Exiting...")
 	sys.exit(0)
