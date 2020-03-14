@@ -166,6 +166,15 @@ def main():
 	else:
 		# Add counts to Service Status string
 		serviceStatusStr = 'There is ' + str(noOfOKServices) + " Service(s) in 'OK' status and " + str(noOfNotOKServices) + " Service(s) that are in 'Not OK' status:\n" + serviceStatusStr
+
+	# Check if there are any enabled service(s) that are not OK
+	if noOfNotOKServices > 0:
+		# As there is at least one enabled Service that is not OK make sure email is sent
+		if sendEmail == False:
+			if (debug):
+				print ("DEBUG INFO: At least one Service is in a 'Not OK' state. Set Send Email Flag to True")
+			sendEmail = True
+
 	# Build OS Command string to check for any failed systemd units
 	osCommand = 'systemctl list-units --state=failed --no-legend'
 	# Execute the OS Command
@@ -186,7 +195,7 @@ def main():
 			failedServicesStr = 'The following ' + str(i) + ' services are in a failed state:\n' + failedServicesStr
 		else:
 			failedServicesStr = 'The following service is in a failed state:\n' + failedServicesStr
-		# As there is at least one Service that is not OK make sure email is sent
+		# As there is at least one Service that is in a failed state make sure email is sent
 		if sendEmail == False:
 			if (debug):
 				print ("DEBUG INFO: At least one Service is in a failed state. Set Send Email Flag to True")
