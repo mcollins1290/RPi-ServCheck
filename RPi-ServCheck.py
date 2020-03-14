@@ -5,6 +5,7 @@ try:
 	import os
 	import subprocess
 	import configparser
+	import socket
 
 	from email.mime.multipart import MIMEMultipart
 	from email.mime.text import MIMEText
@@ -22,16 +23,23 @@ EMAILSETTINGS = []
 ## GLOBAL VARS ##
 
 debug = True
-sendEmailonOK = True
+sendEmail = False
 
 #################
 
 def str2bool(str):
 	return str == "T"
 
+def get_ip_address():
+	s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+	s.connect(("8.8.8.8", 80)) #Google DNS IP for connection test
+	ip_addr = s.getsockname()[0]
+	s.close()
+	return(ip_addr)
+
 def chkArgs(argv):
-	global sendEmailonOK
-	usageMsg = "usage: " + sys.argv[0] + " <SendEmailOnOK? (T/F)>"
+	global sendEmail
+	usageMsg = "usage: " + sys.argv[0] + " <SendEmailwhenOK? (T/F)>"
 
 	if len(argv) != 1:
 		print(usageMsg)
@@ -41,7 +49,10 @@ def chkArgs(argv):
 		print(usageMsg)
 		sys.exit(2)
 
-	sendEmailonOK = str2bool(argv[0])
+	sendEmail = str2bool(argv[0])
+
+	if (debug):
+		print ("DEBUG INFO: Send Email flag is set to: " + str(sendEmail))
 
 def getSettings():
 	global GENERAL
@@ -105,7 +116,7 @@ def getSettings():
 				print(key, value)
 			for key, value in SERVICES.items():
 				print(key, value)
-			print("\nDEBUG INFO: Dump Complete")
+			print("\nDEBUG INFO: Dictionary Dump Complete")
 		###############################################
 
 	except ValueError as e:
@@ -117,11 +128,14 @@ def main():
 	global SERVICES
 	global EXITCODES
 	global EMAILSETTINGS
+	global sendEmail
 
 	noOfOKServices = 0
 	noOfNotOKServices = 0
 	serviceStatusStr = ''
 	failedServicesStr = ''
+	emailBodyStr = ''
+	emailSubjectStr = ''
 
 	# Check Enabled flag in settings file is set to True, otherwise print message and exit
 	if not(GENERAL['ENABLED']):
@@ -146,25 +160,58 @@ def main():
 			# Add to string keeping a record of services checked along with their Exit Code info.
 			serviceStatusStr += serviceName + ': ' + str(exitCode) + ' (' + EXITCODES.get(str(exitCode), 'Unknown Exit Code') + ')\n'
 
-	# Now check for any systemd units in failed status
+	if (noOfOKServices == 0 and noOfNotOKServices == 0):
+		# No services are enabled in settings.ini file
+		serviceStatusStr = 'No services are enabled, please check settings file.\n'
+	else:
+		# Add counts to Service Status string
+		serviceStatusStr = 'There is ' + str(noOfOKServices) + " Service(s) in 'OK' status and " + str(noOfNotOKServices) + " Service(s) that are in 'Not OK' status:\n" + serviceStatusStr
+	# Build OS Command string to check for any failed systemd units
 	osCommand = 'systemctl list-units --state=failed --no-legend'
+	# Execute the OS Command
 	proc = subprocess.Popen(osCommand, stdout=subprocess.PIPE, shell=True)
+	# Read the stdout of the OS Command execution
 	osCommandOutput = proc.stdout.read().decode('UTF-8')
 
+	# Now check for any failed systemd units and prepare a string accordingly
 	i = 0
 	if len(osCommandOutput) > 0:
-		failedServicesStr = 'The following services are in a failed state:\n'
 		for line in osCommandOutput.split('\n'):
 			if len(line) > 0:
 				if i > 0:
 					failedServicesStr += '\n'
 				failedServicesStr += line.split(' ')[0]
 				i += 1
+		if i > 1:
+			failedServicesStr = 'The following ' + str(i) + ' services are in a failed state:\n' + failedServicesStr
+		else:
+			failedServicesStr = 'The following service is in a failed state:\n' + failedServicesStr
+		# As there is at least one Service that is not OK make sure email is sent
+		if sendEmail == False:
+			if (debug):
+				print ("DEBUG INFO: At least one Service is in a failed state. Set Send Email Flag to True")
+			sendEmail = True
 	else:
 		failedServicesStr = 'No systemd units are in a failed state.'
 
-	print("#" + failedServicesStr + "#")
+	if sendEmail == False:
+		# Exit Main function if no need to send email
+		if (debug):
+			print ("DEBUG INFO: All Services OK. No request to send email.")
+		return
 
+	if (debug):
+		print ("DEBUG INFO: Now preparing email body & subject")
+
+	# Prepare the Email Body string
+	emailBodyStr = serviceStatusStr + '\n' + failedServicesStr + "\n\nIP Address: " + get_ip_address()
+	if (debug):
+		print ("DEBUG INFO: Email Body =\n[" + emailBodyStr + "]")
+
+	# Prepare the Email Subject string
+	emailSubjectStr = "RPi Services Check Results for host " + get_ip_address()
+	if (debug):
+		print ("DEBUG INFO: Email Subject =\n[" + emailSubjectStr + "]")
 
 if __name__ == '__main__':
 
