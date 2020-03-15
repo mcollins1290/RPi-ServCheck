@@ -280,6 +280,7 @@ def main():
 		print ("INFO: Email sent successfully.")
 	else:
 		print ("ERROR: Email was not sent successfully.")
+		sys.exit(1)
 
 if __name__ == '__main__':
 
