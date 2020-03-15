@@ -263,7 +263,7 @@ def main():
 		print ("DEBUG INFO: Email Body =\n[" + emailBodyStr + "]")
 
 	# Prepare the Email Subject string
-	emailSubjectStr = "RPi Services Check Results for host " + get_ip_address()
+	emailSubjectStr = "RPi Services Check Results for host " + socket.gethostbyaddr(socket.gethostname())[0]
 	if (debug):
 		print ("DEBUG INFO: Email Subject =\n[" + emailSubjectStr + "]")
 
