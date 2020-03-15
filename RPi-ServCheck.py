@@ -6,6 +6,7 @@ try:
 	import subprocess
 	import configparser
 	import socket
+	import smtplib
 
 	from email.mime.multipart import MIMEMultipart
 	from email.mime.text import MIMEText
@@ -22,7 +23,7 @@ EMAILSETTINGS = []
 
 ## GLOBAL VARS ##
 
-debug = True
+debug = False
 sendEmail = False
 
 #################
@@ -53,6 +54,51 @@ def chkArgs(argv):
 
 	if (debug):
 		print ("DEBUG INFO: Send Email flag is set to: " + str(sendEmail))
+
+def SendEmail(iFromEmail, iToEmail, iPassword, iSMTPHost, iSMTPPort, iEmailSubject, iEmailBody):
+	if (debug):
+		print ("DEBUG INFO: Entering Send Email procedure")
+		print ("DEBUG INFO: From Email: " + iFromEmail)
+		print ("DEBUG INFO: To Email: " + iToEmail)
+		print ("DEBUG INFO: Password: " + iPassword)
+		print ("DEBUG INFO: SMTP Host: " + iSMTPHost)
+		print ("DEBUG INFO: SMTP Port: " + str(iSMTPPort))
+		print ("DEBUG INFO: Email Subject: [" + iEmailSubject + "]")
+		print ("DEBUG INFO: Email Body: [" + iEmailBody + "]")
+
+	# Set up the SMTP server connection
+	try:
+		s = smtplib.SMTP(iSMTPHost,iSMTPPort)
+		s.starttls()
+		s.login(iFromEmail, iPassword)
+	except:
+		print("ERROR: Unexpected error during SMTP Connection:", sys.exc_info())
+		raise
+
+	# Create a MIMEMultipart message required for email
+	msg = MIMEMultipart()
+
+	# Setup message parameters
+	msg['From']=iFromEmail
+	msg['To']=iToEmail
+	msg['Subject']=iEmailSubject
+	msg.attach(MIMEText(iEmailBody, 'plain'))
+
+	# Now try and send Email
+	try:
+		s.send_message(msg)
+		# Delete the message object now that the message has been sent
+		del msg
+		# Terminate the SMTP session and close the connection
+		s.quit()
+	except:
+		print("ERROR: Unexpected error during email transmission:", sys.exc_info())
+		raise
+
+	if (debug):
+		print ("DEBUG INFO: Leaving Send Email procedure")
+	# Email sent successfully. Return success value
+	return True
 
 def getSettings():
 	global GENERAL
@@ -205,8 +251,7 @@ def main():
 
 	if sendEmail == False:
 		# Exit Main function if no need to send email
-		if (debug):
-			print ("DEBUG INFO: All Services OK. No request to send email.")
+		print ("INFO: All Services OK. No request to send email.")
 		return
 
 	if (debug):
@@ -221,6 +266,20 @@ def main():
 	emailSubjectStr = "RPi Services Check Results for host " + get_ip_address()
 	if (debug):
 		print ("DEBUG INFO: Email Subject =\n[" + emailSubjectStr + "]")
+
+	# Attempt to send email
+	retVal = SendEmail( 	EMAILSETTINGS['FROM_EMAIL'],
+				EMAILSETTINGS['TO_EMAIL'],
+				EMAILSETTINGS['PASSWORD'],
+				EMAILSETTINGS['SMTP_HOST'],
+				EMAILSETTINGS['SMTP_PORT'],
+				emailSubjectStr,
+				emailBodyStr)
+
+	if (retVal):
+		print ("INFO: Email sent successfully.")
+	else:
+		print ("ERROR: Email was not sent successfully.")
 
 if __name__ == '__main__':
 
