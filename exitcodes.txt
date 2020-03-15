@@ -1,7 +1,0 @@
-[ExitCodes]
-0 = "Zero is my favorite"
-1 = "One is not my /run/var/lock favorite"
-2 = Two
-3 = Three
-4 = Four
-5 = Five
