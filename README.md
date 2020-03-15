@@ -16,7 +16,9 @@ The following BASH launcher scripts are available:
 
 The following are example CRON entries to run the aforementioned BASH launcher scripts:
 
+```
 # RPi-ServCheck scripts
 0 0 * * * /root/Git/RPi-ServCheck/midnight-launcher.sh
 0 * * * * /root/Git/RPi-ServCheck/hourly-launcher.sh
 @reboot /root/Git/RPi-ServCheck/reboot-launcher.sh
+```
