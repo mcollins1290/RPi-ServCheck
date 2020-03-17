@@ -40,22 +40,32 @@ def get_ip_address():
 
 def chkArgs(argv):
 	global sendEmail
-	usageMsg = "usage: " + sys.argv[0] + " <SendEmailwhenOK? (T/F)>"
+	global debug
+	usageMsg = "usage: " + sys.argv[0] + " <SendEmailwhenOK? (T/F)> <Optional: Debug? (T/F)>"
 
-	if len(argv) != 1:
+	if (len(argv) == 0 or len(argv) > 2):
 		print(usageMsg)
 		sys.exit(2)
 
-	if argv[0] != 'T' and argv[0] != 'F':
+	if (argv[0] != 'T' and argv[0] != 'F'):
 		print(usageMsg)
 		sys.exit(2)
+	else:
+		sendEmail = str2bool(argv[0])
 
-	sendEmail = str2bool(argv[0])
+	if len(argv) == 2:
+		if (argv[1] != 'T' and argv[1] != 'F'):
+			print(usageMsg)
+			sys.exit(2)
+		else:
+			debug = str2bool(argv[1])
 
 	if (debug):
 		print ("DEBUG INFO: Send Email flag is set to: " + str(sendEmail))
 
 def SendEmail(iFromEmail, iToEmail, iPassword, iSMTPHost, iSMTPPort, iEmailSubject, iEmailBody):
+	global debug
+
 	if (debug):
 		print ("DEBUG INFO: Entering Send Email procedure")
 		print ("DEBUG INFO: From Email: " + iFromEmail)
@@ -105,6 +115,7 @@ def getSettings():
 	global SERVICES
 	global EXITCODES
 	global EMAILSETTINGS
+	global debug
 	settings_filename = './settings.ini'
 
 	config = configparser.ConfigParser()
@@ -122,7 +133,7 @@ def getSettings():
 			sys.exit(1)
 
 		if section == 'General':
-			for option in [ 'Enabled','OKExitCode' ]:
+			for option in [ 'Enabled','OKExitCode','OKStatus','NotOKStatus' ]:
 				if not config.has_option(section, option):
 					print("ERROR: Missing " + section + " option: " + option +". Please check " + settings_filename)
 					sys.exit(1)
@@ -138,7 +149,9 @@ def getSettings():
 		# Populate General dict
 		GENERAL = {
 			'ENABLED':config.getboolean('General', 'Enabled'),
-			'OKEXITCODE':config.getint('General','OKExitCode')}
+			'OKEXITCODE':config.getint('General','OKExitCode'),
+			'OKSTATUS':config.get('General','OKStatus'),
+			'NOTOKSTATUS':config.get('General','NotOKStatus')}
 		# Populate Email Settings dict
 		EMAILSETTINGS =	{
 			'FROM_EMAIL':config.get('EmailSettings', 'FromEmail'),
@@ -175,6 +188,7 @@ def main():
 	global EXITCODES
 	global EMAILSETTINGS
 	global sendEmail
+	global debug
 
 	noOfOKServices = 0
 	noOfNotOKServices = 0
@@ -182,6 +196,7 @@ def main():
 	failedServicesStr = ''
 	emailBodyStr = ''
 	emailSubjectStr = ''
+	emailSubjectStatusStr = GENERAL['OKSTATUS']
 
 	# Check Enabled flag in settings file is set to True, otherwise print message and exit
 	if not(GENERAL['ENABLED']):
@@ -220,6 +235,8 @@ def main():
 			if (debug):
 				print ("DEBUG INFO: At least one Service is in a 'Not OK' state. Set Send Email Flag to True")
 			sendEmail = True
+		# Update Email Subject Status to indicate a 'Not OK' status
+		emailSubjectStatusStr = GENERAL['NOTOKSTATUS']
 
 	# Build OS Command string to check for any failed systemd units
 	osCommand = 'systemctl list-units --state=failed --no-legend'
@@ -246,6 +263,9 @@ def main():
 			if (debug):
 				print ("DEBUG INFO: At least one Service is in a failed state. Set Send Email Flag to True")
 			sendEmail = True
+		if emailSubjectStatusStr == GENERAL['OKSTATUS']:
+			# Update Email Subject Status to indicate a 'Not OK' status
+			emailSubjectStatusStr = GENERAL['NOTOKSTATUS']
 	else:
 		failedServicesStr = 'No systemd units are in a failed state.'
 
@@ -263,7 +283,7 @@ def main():
 		print ("DEBUG INFO: Email Body =\n[" + emailBodyStr + "]")
 
 	# Prepare the Email Subject string
-	emailSubjectStr = "RPi Services Check Results for host " + socket.gethostbyaddr(socket.gethostname())[0]
+	emailSubjectStr = emailSubjectStatusStr + " - RPi Services Check Results for host " + socket.gethostbyaddr(socket.gethostname())[0]
 	if (debug):
 		print ("DEBUG INFO: Email Subject =\n[" + emailSubjectStr + "]")
 
