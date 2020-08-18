@@ -26,6 +26,7 @@ EMAILSETTINGS = []
 debug = False
 sendEmail = False
 rebootFilePath = './reboot'
+rebootEmSubStr = "[REBOOT]"
 
 #################
 
@@ -190,6 +191,7 @@ def main():
 	global EMAILSETTINGS
 	global sendEmail
 	global rebootFilePath
+	global rebootEmSubStr
 	global debug
 
 	noOfOKServices = 0
@@ -287,7 +289,7 @@ def main():
 	# Prepare the Email Subject string
 	emailSubjectStr = emailSubjectStatusStr + " - RPi Services Check Results for host " + socket.gethostbyaddr(socket.gethostname())[0]
 	if (os.path.isfile(rebootFilePath)):
-		emailSubjectStr = emailSubjectStr + " [REBOOT]"
+		emailSubjectStr = emailSubjectStr + " " + rebootEmSubStr
 		os.remove(rebootFilePath)
 
 	if (debug):
