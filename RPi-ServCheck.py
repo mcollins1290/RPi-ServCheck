@@ -121,6 +121,7 @@ def getSettings():
 	settings_filename = './settings.ini'
 
 	config = configparser.ConfigParser()
+	config.optionxform=str
 	config.read(settings_filename)
 
 	# If settings file is missing, print error to CLI and Exit
