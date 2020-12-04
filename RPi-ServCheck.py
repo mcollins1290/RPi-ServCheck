@@ -12,7 +12,7 @@ try:
 	from email.mime.text import MIMEText
 
 except ImportError as e:
-	print("ERROR: Error loading module: " + str(e))
+	print("ERROR: Error importing module: " + str(e))
 	sys.exit(1)
 
 ## GLOBAL DICTS ##
@@ -20,6 +20,7 @@ GENERAL = []
 SERVICES = []
 EXITCODES = []
 EMAILSETTINGS = []
+GPIOSETTINGS = []
 
 ## GLOBAL VARS ##
 
@@ -27,6 +28,7 @@ debug = False
 sendEmail = False
 rebootFilePath = './reboot'
 rebootEmSubStr = "[REBOOT]"
+GPIO = None
 
 #################
 
@@ -112,11 +114,29 @@ def SendEmail(iFromEmail, iToEmail, iPassword, iSMTPHost, iSMTPPort, iEmailSubje
 	# Email sent successfully. Return success value
 	return True
 
+def activateRedLED():
+	if (debug):
+		print("DEBUG INFO: Turning on Red LED")
+	# Turn off Green LED if ON
+	GPIO.output(GPIOSETTINGS['GREEN_LED'],GPIO.LOW)
+	# Now switch on Red LED
+	GPIO.output(GPIOSETTINGS['RED_LED'],GPIO.HIGH)
+
+def activateGreenLED():
+	if (debug):
+                print("DEBUG INFO: Turning on Green LED")
+	# Turn off Red LED if ON
+	GPIO.output(GPIOSETTINGS['RED_LED'],GPIO.LOW)
+	# Now switch on Green LED
+	GPIO.output(GPIOSETTINGS['GREEN_LED'],GPIO.HIGH)
+
 def getSettings():
 	global GENERAL
 	global SERVICES
 	global EXITCODES
 	global EMAILSETTINGS
+	global GPIOSETTINGS
+	global GPIO
 	global debug
 	settings_filename = './settings.ini'
 
@@ -130,7 +150,7 @@ def getSettings():
 		sys.exit(1)
 
 	# File exists, check sections and options are present. If not, print error to CLI and Exit.
-	for section in [ 'General','Services','ExitCodes','EmailSettings' ]:
+	for section in [ 'General','Services','ExitCodes','EmailSettings','GPIO' ]:
 		if not config.has_section(section):
 			print("ERROR: Missing config file section: " + section +". Please check " + settings_filename)
 			sys.exit(1)
@@ -147,6 +167,13 @@ def getSettings():
 					print("ERROR: Missing " + section + " option: " + option +". Please check " + settings_filename)
 					sys.exit(1)
 
+		if section == 'GPIO':
+			for option in [ 'Enabled','Mode','RedLED','GreenLED' ]:
+				if not config.has_option(section, option):
+					print("ERROR: Missing " + section + " option: " + option +". Please check " + settings_filename)
+					sys.exit(1)
+
+
 	# Settings file sections and options valid. Now retrieve/parse values and store in global dicts
 	try:
 		# Populate General dict
@@ -162,6 +189,12 @@ def getSettings():
 			'PASSWORD':config.get('EmailSettings', 'Password'),
 			'SMTP_HOST':config.get('EmailSettings', 'SMTPHost'),
 			'SMTP_PORT':config.getint('EmailSettings', 'SMTPPort')}
+		# Populate GPIO dict
+		GPIOSETTINGS = {
+			'ENABLED':config.getboolean('GPIO', 'Enabled'),
+			'MODE':config.get('GPIO', 'Mode'),
+			'RED_LED':config.getint('GPIO', 'RedLED'),
+			'GREEN_LED':config.getint('GPIO', 'GreenLED')}
 		# Populate Exit Codes dict
 		EXITCODES = dict(config.items('ExitCodes'))
 		# Populate Services dict
@@ -178,8 +211,41 @@ def getSettings():
 				print(key, value)
 			for key, value in SERVICES.items():
 				print(key, value)
+			for key, value in GPIOSETTINGS.items():
+				print(key, value)
 			print("\nDEBUG INFO: Dictionary Dump Complete")
 		###############################################
+
+		# If GPIO is enabled, try to import RPi.GPIO module and configure GPIO outputs
+		if (GPIOSETTINGS['ENABLED']):
+			print("INFO: GPIO Enabled in settings file.")
+			try:
+				import RPi.GPIO as GPIO
+			except ImportError as e:
+				print("ERROR: Error importing RPi.GPIO module: " + str(e))
+				sys.exit(1)
+
+			# Check GPIO Mode in settings file to make sure it is valid
+			if (GPIOSETTINGS['MODE'] == "GPIO.BCM"):
+				print("INFO: Setting GPIO Mode to GPIO.BCM")
+				GPIO.setmode(GPIO.BCM)
+			elif (GPIOSETTINGS['MODE'] == "GPIO.BOARD"):
+				print("INFO: Setting GPIO Mode to GPIO.BOARD")
+				GPIO.setmode(GPIO.BOARD)
+			else:
+				print("ERROR: Invalid value for GPIO.MODE in settings file.")
+				sys.exit()
+
+			try:
+				GPIO.setwarnings(False)
+				GPIO.setup(GPIOSETTINGS['RED_LED'],GPIO.OUT)
+				GPIO.setup(GPIOSETTINGS['GREEN_LED'],GPIO.OUT)
+			except:
+				print("ERROR: Error configuring RPi.GPIO module: " + str(sys.exc_info()))
+				sys.exit(1)
+			print("INFO: Successfully imported & configured RPi.GPIO module.")
+		else:
+			print("INFO: GPIO is not enabled in the settings file.")
 
 	except ValueError as e:
 		print("ERROR: Unable to parse values from settings file: \n" + str(e))
@@ -190,6 +256,7 @@ def main():
 	global SERVICES
 	global EXITCODES
 	global EMAILSETTINGS
+	global GPIOSETTINGS
 	global sendEmail
 	global rebootFilePath
 	global rebootEmSubStr
@@ -205,7 +272,7 @@ def main():
 
 	# Check Enabled flag in settings file is set to True, otherwise print message and exit
 	if not(GENERAL['ENABLED']):
-		print("INFO: 'Enabled' flag in settings file is not set to True. Exiting...")
+		print("INFO: 'Enabled' flag in the [General] section of the settings file is not set to True. Exiting...")
 		sys.exit(0)
 
 	# Iterate through Services dict, check Service status for each enabled Service
@@ -273,6 +340,15 @@ def main():
 			emailSubjectStatusStr = GENERAL['NOTOKSTATUS']
 	else:
 		failedServicesStr = 'No systemd units are in a failed state.'
+
+	# If GPIO is enabled, switch on the appropiate LED
+	if (GPIOSETTINGS['ENABLED']):
+		if emailSubjectStatusStr == GENERAL['OKSTATUS']:
+			activateGreenLED()
+		elif emailSubjectStatusStr == GENERAL['NOTOKSTATUS']:
+			activateRedLED()
+		else:
+			print("ERROR: Unexpected error with determining which LED to enable based on Email Subject Status.")
 
 	if sendEmail == False:
 		# Exit Main function if no need to send email
