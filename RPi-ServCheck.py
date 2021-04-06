@@ -29,6 +29,7 @@ sendEmail = False
 rebootFilePath = './reboot'
 rebootEmSubStr = "[REBOOT]"
 GPIO = None
+sysExitCode = None
 
 #################
 
@@ -49,18 +50,18 @@ def chkArgs(argv):
 
 	if (len(argv) == 0 or len(argv) > 2):
 		print(usageMsg)
-		sys.exit(2)
+		sys.exit(1)
 
 	if (argv[0] != 'T' and argv[0] != 'F'):
 		print(usageMsg)
-		sys.exit(2)
+		sys.exit(1)
 	else:
 		sendEmail = str2bool(argv[0])
 
 	if len(argv) == 2:
 		if (argv[1] != 'T' and argv[1] != 'F'):
 			print(usageMsg)
-			sys.exit(2)
+			sys.exit(1)
 		else:
 			debug = str2bool(argv[1])
 
@@ -260,6 +261,7 @@ def main():
 	global sendEmail
 	global rebootFilePath
 	global rebootEmSubStr
+	global sysExitCode
 	global debug
 
 	noOfOKServices = 0
@@ -309,6 +311,8 @@ def main():
 			sendEmail = True
 		# Update Email Subject Status to indicate a 'Not OK' status
 		emailSubjectStatusStr = GENERAL['NOTOKSTATUS']
+		# Set (sys) exit code to 2 to indicate a 'Not OK' status
+		sysExitCode = 2
 
 	# Build OS Command string to check for any failed systemd units
 	osCommand = 'systemctl list-units --state=failed --no-legend'
@@ -338,6 +342,8 @@ def main():
 		if emailSubjectStatusStr == GENERAL['OKSTATUS']:
 			# Update Email Subject Status to indicate a 'Not OK' status
 			emailSubjectStatusStr = GENERAL['NOTOKSTATUS']
+		# Set (sys) exit code to 2 to indicate a 'Not OK' status
+		sysExitCode = 2
 	else:
 		failedServicesStr = 'No systemd units are in a failed state.'
 
@@ -353,6 +359,8 @@ def main():
 	if sendEmail == False:
 		# Exit Main function if no need to send email
 		print ("INFO: All Services OK. No request to send email.")
+		# Set (sys) exit code to 0 to indicate an 'OK' status
+		sysExitCode = 0
 		return
 
 	if (debug):
@@ -403,4 +411,4 @@ if __name__ == '__main__':
 	# Program complete. Exit cleanly
 	if (debug):
 		print("DEBUG INFO: Process completed successfully. Exiting...")
-	sys.exit(0)
+	sys.exit(sysExitCode)
