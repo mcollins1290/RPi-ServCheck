@@ -15,7 +15,7 @@ if [ "$LOGTOSQL" = true ] ; then
 			 --data-urlencode "context=R" \
 			 --data-urlencode "comment=${logtext}" \
 			 --data-urlencode "hostname=$HOSTNAME" \
-			http://localhost:5000/insert/checklog)
+			http://raspberrypi2.nyave:5000/insert/checklog)
 
 	echo "Log Result: $result"
 fi

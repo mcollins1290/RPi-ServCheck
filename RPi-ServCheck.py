@@ -29,7 +29,7 @@ sendEmail = False
 rebootFilePath = './reboot'
 rebootEmSubStr = "[REBOOT]"
 GPIO = None
-sysExitCode = None
+sysExitCode = 0
 
 #################
 
