@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.7
+#!/usr/bin/env python3
 
 try:
 	import sys
@@ -29,7 +29,7 @@ sendEmail = False
 rebootFilePath = './reboot'
 rebootEmSubStr = "[REBOOT]"
 GPIO = None
-sysExitCode = None
+sysExitCode = 0
 
 #################
 
