@@ -315,7 +315,7 @@ def main():
 		sysExitCode = 2
 
 	# Build OS Command string to check for any failed systemd units
-	osCommand = 'systemctl list-units --state=failed --no-legend'
+	osCommand = 'systemctl list-units --state=failed --plain --no-legend'
 	# Execute the OS Command
 	proc = subprocess.Popen(osCommand, stdout=subprocess.PIPE, shell=True)
 	# Read the stdout of the OS Command execution
