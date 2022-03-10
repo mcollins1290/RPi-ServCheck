@@ -7,6 +7,7 @@ try:
 	import configparser
 	import socket
 	import smtplib
+	import time
 
 	from email.mime.multipart import MIMEMultipart
 	from email.mime.text import MIMEText
@@ -379,6 +380,9 @@ def main():
 
 	if (debug):
 		print ("DEBUG INFO: Email Subject =\n[" + emailSubjectStr + "]")
+
+	# Attempt to address '4.3.0 Temporary System Problem.  Try again later'
+	time.sleep(1)
 
 	# Attempt to send email
 	retVal = SendEmail( 	EMAILSETTINGS['FROM_EMAIL'],
