@@ -381,9 +381,6 @@ def main():
 	if (debug):
 		print ("DEBUG INFO: Email Subject =\n[" + emailSubjectStr + "]")
 
-	# Attempt to address '4.3.0 Temporary System Problem.  Try again later'
-	time.sleep(1)
-
 	# Attempt to send email
 	retVal = SendEmail( 	EMAILSETTINGS['FROM_EMAIL'],
 				EMAILSETTINGS['TO_EMAIL'],
