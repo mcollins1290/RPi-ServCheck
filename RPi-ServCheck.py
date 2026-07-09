@@ -5,6 +5,7 @@ try:
 	import os
 	import subprocess
 	import configparser
+	import json
 	import socket
 	import smtplib
 	import time
@@ -31,6 +32,7 @@ rebootFilePath = './reboot'
 rebootEmSubStr = "[REBOOT]"
 GPIO = None
 sysExitCode = 0
+remoteAccessHealthPath = '/opt/remote-access/monitoring/remote_access_health.py'
 
 #################
 
@@ -43,6 +45,50 @@ def get_ip_address():
 	ip_addr = s.getsockname()[0]
 	s.close()
 	return(ip_addr)
+
+def runRemoteAccessHealth():
+	if (debug):
+		print("DEBUG INFO: Running remote access health checks")
+
+	try:
+		proc = subprocess.run(
+			[remoteAccessHealthPath, '--format', 'json'],
+			stdout=subprocess.PIPE,
+			stderr=subprocess.PIPE,
+			text=True,
+			timeout=35,
+			check=False)
+	except subprocess.TimeoutExpired:
+		return (1, 0, 'Remote Access Stack: FAILED\n  Checker timed out after 35 seconds')
+	except OSError as e:
+		return (1, 0, 'Remote Access Stack: FAILED\n  Checker could not be executed: ' + str(e))
+
+	if proc.stdout.strip() == '':
+		return (1, 0, 'Remote Access Stack: FAILED\n  Checker returned no output. stderr=' + proc.stderr.strip())
+
+	try:
+		payload = json.loads(proc.stdout)
+	except ValueError as e:
+		return (1, 0, 'Remote Access Stack: FAILED\n  Checker returned invalid JSON: ' + str(e))
+
+	checks = payload.get('checks', [])
+	failed = [item for item in checks if item.get('status') == 'FAILED']
+	warnings = [item for item in checks if item.get('status') == 'WARNING']
+
+	lines = [
+		'Remote Access Stack: ' + payload.get('summary', {}).get('status', 'UNKNOWN') +
+		' (' + payload.get('summary', {}).get('detail', 'no detail') + ')'
+	]
+	for item in checks:
+		lines.append('  {label}: {status} - {detail}'.format(
+			label=item.get('label', 'Unknown'),
+			status=item.get('status', 'UNKNOWN'),
+			detail=item.get('detail', 'no detail')))
+
+	if proc.stderr.strip():
+		lines.append('  checker stderr: ' + proc.stderr.strip())
+
+	return (len(failed), len(warnings), '\n'.join(lines))
 
 def chkArgs(argv):
 	global sendEmail
@@ -269,6 +315,7 @@ def main():
 	noOfNotOKServices = 0
 	serviceStatusStr = ''
 	failedServicesStr = ''
+	remoteAccessStatusStr = ''
 	emailBodyStr = ''
 	emailSubjectStr = ''
 	emailSubjectStatusStr = GENERAL['OKSTATUS']
@@ -348,6 +395,18 @@ def main():
 	else:
 		failedServicesStr = 'No systemd units are in a failed state.'
 
+	remoteAccessFailures, remoteAccessWarnings, remoteAccessStatusStr = runRemoteAccessHealth()
+	print(remoteAccessStatusStr)
+
+	if remoteAccessFailures > 0:
+		if sendEmail == False:
+			if (debug):
+				print ("DEBUG INFO: Remote access health check failed. Set Send Email Flag to True")
+			sendEmail = True
+		if emailSubjectStatusStr == GENERAL['OKSTATUS']:
+			emailSubjectStatusStr = GENERAL['NOTOKSTATUS']
+		sysExitCode = 2
+
 	# If GPIO is enabled, switch on the appropiate LED
 	if (GPIOSETTINGS['ENABLED']):
 		if emailSubjectStatusStr == GENERAL['OKSTATUS']:
@@ -368,7 +427,7 @@ def main():
 		print ("DEBUG INFO: Now preparing email body & subject")
 
 	# Prepare the Email Body string
-	emailBodyStr = serviceStatusStr + '\n' + failedServicesStr + "\n\nIP Address: " + get_ip_address()
+	emailBodyStr = serviceStatusStr + '\n' + failedServicesStr + '\n\n' + remoteAccessStatusStr + "\n\nIP Address: " + get_ip_address()
 	if (debug):
 		print ("DEBUG INFO: Email Body =\n[" + emailBodyStr + "]")
 
